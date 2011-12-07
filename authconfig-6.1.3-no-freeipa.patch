@@ -1,0 +1,37 @@
+diff -up authconfig-6.1.3/authconfig-gtk.py.no-freeipa authconfig-6.1.3/authconfig-gtk.py
+--- authconfig-6.1.3/authconfig-gtk.py.no-freeipa	2010-04-07 21:48:09.000000000 +0200
++++ authconfig-6.1.3/authconfig-gtk.py	2010-04-07 22:17:31.000000000 +0200
+@@ -99,9 +99,9 @@ class Authconfig:
+ 			"LDAP":
+ 			(_("LDAP"), ("Kerberos", "LDAPAuth"),
+ 			 "ldapoptions", "ldap_map", authinfo.PATH_LIBNSS_SSS, "sssd-client"),
+-			"FreeIPA":
+-			(_("FreeIPA"), ("Kerberos"),
+-			 "ldapoptions", "ldap_map", authinfo.PATH_LIBNSS_SSS, "sssd-client"),
++#			"FreeIPA":
++#			(_("FreeIPA"), ("Kerberos"),
++#			 "ldapoptions", "ldap_map", authinfo.PATH_LIBNSS_SSS, "sssd-client"),
+ 			"NIS":
+ 			(_("NIS"), ("NISAuth", "Kerberos"),
+ 			 "nisoptions", "nis_map", authinfo.PATH_LIBNSS_NIS, "ypbind"),
+@@ -110,7 +110,8 @@ class Authconfig:
+ 			 "winbindoptions", "winbind_map", authinfo.PATH_LIBNSS_WINBIND, "samba-client")
+ 		}
+ 		# to keep the order we need a tuple
+-		self.id_keys = ("local", "LDAP", "FreeIPA", "NIS", "Winbind")
++		self.id_keys = ("local", "LDAP",# "FreeIPA",
++				"NIS", "Winbind")
+ 		# "auth type": localized name,
+ 		# option widget, option map name, file, package
+ 		self.auth_map = {
+@@ -358,8 +359,8 @@ class Authconfig:
+ 			if meth != 'local':
+ 				try:
+ 					if getattr(self.info, 'enable' + meth):
+-						if meth == 'LDAP' and self.info.ldapSchema == 'rfc2307bis':
+-							meth = 'FreeIPA'
++#						if meth == 'LDAP' and self.info.ldapSchema == 'rfc2307bis':
++#							meth = 'FreeIPA'
+ 						return meth
+ 				except AttributeError:
+ 					pass

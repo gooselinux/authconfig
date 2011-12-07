@@ -1,0 +1,168 @@
+diff -up authconfig-6.1.4/authconfig-gtk.py.backports authconfig-6.1.4/authconfig-gtk.py
+--- authconfig-6.1.4/authconfig-gtk.py.backports	2010-06-10 14:18:22.000000000 +0200
++++ authconfig-6.1.4/authconfig-gtk.py	2010-06-10 14:18:22.000000000 +0200
+@@ -147,8 +147,8 @@ class Authconfig:
+ 			"krbrealm" : ("kerberosRealm", ""),
+ 			"kdc" : ("kerberosKDC", ""),
+ 			"adminserver" : ("kerberosAdminServer", ""),
+-			"dnsrealm" : ("kerberosRealmviaDNS", ""),
+-			"dnskdc" : ("kerberosKDCviaDNS", ""),
++			"dnsrealm" : ("kerberosRealmviaDNS", "", "", "", self.kerberos_dns),
++			"dnskdc" : ("kerberosKDCviaDNS", "", "", "", self.kerberos_dns),
+ 		}
+ 		self.ldap_map = {
+ 			"ldaptls" : ("enableLDAPS", "", "", "", self.enable_cacert_download),
+@@ -194,6 +194,9 @@ class Authconfig:
+ 		self.suspendchanges = False
+ 		self.scxml = None
+ 		self.msgctrl = None
++		self.oldrealm = ""
++		self.oldkdc = ""
++		self.oldadminserver = ""
+ 
+ 	def destroy_widget(self, button, widget):
+ 		widget.destroy()
+@@ -297,7 +300,6 @@ class Authconfig:
+ 				widget.set_data("option_list", options)
+ 				widget.connect("changed", self.changeoption,
+ 					       map[entry], xml)
+-				self.changeoption(widget, map[entry], xml)
+ 			if type(widget) == type(gtk.Button()):
+ 				widget.connect("clicked",
+ 					       getattr(self, map[entry][0]),
+@@ -311,21 +313,29 @@ class Authconfig:
+ 				if len(map[entry]) > 4:
+ 					widget.connect("changed", self.changedentry,
+ 						entry, map[entry][4], xml)
+-					self.changedentry(widget,
+-						entry, map[entry][4], xml)
+-
+ 			if type(widget) == type(gtk.CheckButton()):
+ 				widget.set_active(bool(getattr(self.info,
+ 							  map[entry][0])))
+ 				if len(map[entry]) > 4:
+ 					widget.connect("toggled", self.toggleboolean,
+ 						entry, map[entry][4], xml)
+-					self.toggleboolean(widget,
+-						entry, map[entry][4], xml)
+ 			if type(widget) == type(gtk.Label()):
+ 				if getattr(self.info, map[entry][0]):
+ 					widget.set_text(getattr(self.info,
+ 								map[entry][0]))
++		# now run all the triggers as the data is set
++		for entry in map.keys():
++			widget = xml.get_widget(entry)
++			if type(widget) == type(gtk.ComboBox()):
++				self.changeoption(widget, map[entry], xml)
++			if type(widget) == type(gtk.Entry()):
++				if len(map[entry]) > 4:
++					self.changedentry(widget,
++						entry, map[entry][4], xml)
++			if type(widget) == type(gtk.CheckButton()):
++				if len(map[entry]) > 4:
++					self.toggleboolean(widget,
++						entry, map[entry][4], xml)
+ 
+ 	# Create a vbox or dialog using the file, and return it. */
+ 	def run_on_button(self, button, top, mapname, parent=None, responses=()):
+@@ -427,6 +437,34 @@ class Authconfig:
+ 			self.xml.get_widget('idauthpage').show_all()
+ 			apply.set_tooltip_markup("<span color='dark red'>%s</span>" % text)
+ 
++	def kerberos_dns(self, active, xml):
++		dnsrealm = xml.get_widget('dnsrealm').get_active()
++		dnskdc = xml.get_widget('dnskdc').get_active()
++		krbrealm = xml.get_widget('krbrealm')
++		if dnsrealm:
++			if krbrealm.get_property("sensitive"):
++				self.oldrealm = krbrealm.get_text()
++			krbrealm.set_text("")
++		elif self.oldrealm:
++			krbrealm.set_text(self.oldrealm)
++		krbrealm.set_sensitive(not dnsrealm)
++		kdc = xml.get_widget('kdc')
++		adminserver = xml.get_widget('adminserver')
++		if dnskdc:
++			if kdc.get_property("sensitive"):
++				self.oldkdc = kdc.get_text()
++			if adminserver.get_property("sensitive"):
++				self.oldadminserver = adminserver.get_text()
++			kdc.set_text("")
++			adminserver.set_text("")
++		else:
++			if self.oldkdc:
++				kdc.set_text(self.oldkdc)
++			if self.oldadminserver:
++				adminserver.set_text(self.oldadminserver)
++		kdc.set_sensitive(not dnskdc)
++		adminserver.set_sensitive(not dnskdc)
++
+ 	def display_smartcard_opts(self, active, xml):
+ 		if self.scxml:
+ 			self.info_apply(self.smartcard_map, self.scxml)
+@@ -611,12 +649,12 @@ if __name__ == '__main__':
+ 	gladepath = os.path.dirname(authinfo.__file__)+"/authconfig.glade"
+ 	if not os.access(gladepath, os.R_OK):
+ 		gladepath = "/usr/share/authconfig/authconfig.glade"
+-	module = Authconfig()
+-	xml = gtk.glade.XML(gladepath,
+-			    'authconfig', "authconfig")
+ 	gtk.window_set_default_icon_name("system-config-authentication")
+-	dialog = module.get_main_widget(xml)
+ 	while True:
++		module = Authconfig()
++		xml = gtk.glade.XML(gladepath,
++			    'authconfig', "authconfig")
++		dialog = module.get_main_widget(xml)
+ 		response = dialog.run()
+ 		if response == gtk.RESPONSE_OK:
+ 			module.apply()
+@@ -629,8 +667,6 @@ if __name__ == '__main__':
+ 				module.info.restoreLast()
+ 				# reload module
+ 				dialog.destroy()
+-				module = Authconfig()
+-				dialog = module.get_main_widget()
+ 		else:
+ 			dialog.destroy()
+ 			sys.exit(1)
+diff -up authconfig-6.1.4/authinfo.py.backports authconfig-6.1.4/authinfo.py
+--- authconfig-6.1.4/authinfo.py.backports	2010-05-04 17:55:31.000000000 +0200
++++ authconfig-6.1.4/authinfo.py	2010-06-10 14:34:12.000000000 +0200
+@@ -576,6 +576,8 @@ pam_modules[PASSWORD_ONLY] = [
+ 	[True,  PASSWORD,	LOGIC_SUFFICIENT,
+ 	 "unix",		argv_unix_password],
+ 	[False, PASSWORD,	LOGIC_SUFFICIENT,
++	 "sss",			argv_sss_password],
++	[False, PASSWORD,	LOGIC_SUFFICIENT,
+ 	 "afs",			argv_afs_password],
+ 	[False, PASSWORD,	LOGIC_SUFFICIENT,
+ 	 "afs.krb",		argv_afs_password],
+@@ -1278,6 +1280,9 @@ class AuthInfo:
+ 				num += 1
+ 		if num != 1:
+ 			return False
++		# realm via DNS is not supported by the current SSSD
++		if self.enableKerberos and self.kerberosRealmviaDNS:
++			return False
+ 		return True
+ 
+ 	# Read hesiod setup.  Luckily, /etc/hesiod.conf is simple enough that shvfile
+@@ -1532,8 +1537,6 @@ class AuthInfo:
+ 				authprov = domain.get_option('auth_provider')
+ 			except SSSDConfig.NoOptionError:
+ 				authprov = None
+-			if idprov in ('ldap') and authprov in ('ldap', 'krb5'):
+-				self.sssdDomain = domain
+ 		for attr, opt in sssdopt_map.iteritems():
+ 			try:
+ 				# Cache credentials value will be taken from sysconfig
+@@ -3108,7 +3111,7 @@ class AuthInfo:
+ 			if self.enableLDAP:
+ 				normal = normal.replace("sss", "ldap")
+ 			else:
+-				normal = normal.replace("sss", "")
++				normal = normal.replace(" sss", "")
+ 
+ 			# Hostnames we treat specially.
+ 			hosts += " files"
